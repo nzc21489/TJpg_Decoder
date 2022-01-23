@@ -8,6 +8,7 @@ https://github.com/Bodmer/TJpg_Decoder
 */
 
 #include "TJpg_Decoder.h"
+#include <string.h>
 
 // Create a class instance to be used by the sketch (defined as extern in header)
 TJpg_Decoder TJpgDec;
@@ -88,7 +89,7 @@ unsigned int TJpg_Decoder::jd_input(JDEC* jdec, uint8_t* buf, unsigned int len)
     }
 
     // If buf is valid then copy len bytes to buffer
-    if (buf) memcpy_P(buf, (const uint8_t *)(thisPtr->array_data + thisPtr->array_index), len);
+    if (buf) memcpy(buf, (const uint8_t *)(thisPtr->array_data + thisPtr->array_index), len);
 
     // Move pointer
     thisPtr->array_index += len;
@@ -115,17 +116,48 @@ unsigned int TJpg_Decoder::jd_input(JDEC* jdec, uint8_t* buf, unsigned int len)
 #if defined (TJPGD_LOAD_SD_LIBRARY)
   // Handle SD library input
   else if (thisPtr->jpg_source == TJPG_SD_FILE) {
+    UINT br;
     // Check how many bytes are available
-    uint32_t bytesLeft = thisPtr->jpgSdFile.available();
+    // uint32_t bytesLeft = thisPtr->jpgSdFile.available();
+    uint32_t bytesLeft = f_size(&thisPtr->jpgSdFile);
     if (bytesLeft < len) len = bytesLeft;
 
     if (buf) {
       // Read into buffer, pointer moved as well
-      thisPtr->jpgSdFile.read(buf, len);
+      // thisPtr->jpgSdFile.read(buf, len);
+      f_read(&thisPtr->jpgSdFile, buf, len, &br);
     }
     else {
       // Buffer is null, so skip data by moving pointer
-      thisPtr->jpgSdFile.seek(thisPtr->jpgSdFile.position() + len);
+      // thisPtr->jpgSdFile.seek(thisPtr->jpgSdFile.position() + len);
+      f_lseek(&thisPtr->jpgSdFile, f_tell(&thisPtr->jpgSdFile) + len);
+    }
+  }
+  else if (thisPtr->jpg_source == TJPG_SD_AUDIO_FILE){
+    // seek at start
+    if (thisPtr->jpeg_start){
+      // thisPtr->jpgSdFile.seek(thisPtr->jpgSdFile.position() + thisPtr->jpeg_offset);
+      f_lseek(&thisPtr->jpgSdFile, f_tell(&thisPtr->jpgSdFile) + thisPtr->jpeg_offset);
+      thisPtr->jpeg_start = false;
+    }
+    uint32_t bytesLeft = thisPtr->jpeg_size - thisPtr->jpeg_buf_count;
+    
+    if (bytesLeft < len) len = bytesLeft;
+
+    if (buf) {
+      // Read into buffer, pointer moved as well
+      // thisPtr->jpgSdFile.read(buf, len);
+      UINT br;
+      f_read(&thisPtr->jpgSdFile, buf, len, &br);
+      thisPtr->jpeg_buf_count += len;
+      // printf("jpeg audio buf\n");
+      // printf("%d\n", thisPtr->jpgSdFile.position());
+    }
+    else {
+      // Buffer is null, so skip data by moving pointer
+      // thisPtr->jpgSdFile.seek(thisPtr->jpgSdFile.position() + len);
+      f_lseek(&thisPtr->jpgSdFile, f_tell(&thisPtr->jpgSdFile) + len);
+      thisPtr->jpeg_buf_count += len;
     }
   }
 #endif
@@ -181,10 +213,10 @@ JRESULT TJpg_Decoder::drawJpg(int32_t x, int32_t y, const char *pFilename){
 
 /***************************************************************************************
 ** Function name:           drawJpg
-** Description:             Draw a named jpg file at x,y (name in String)
+** Description:             Draw a named jpg file at x,y (name in string)
 ***************************************************************************************/
 // Generic file call for SD or SPIFFS, uses leading / to distinguish SPIFFS files
-JRESULT TJpg_Decoder::drawJpg(int32_t x, int32_t y, const String& pFilename){
+JRESULT TJpg_Decoder::drawJpg(int32_t x, int32_t y, const string& pFilename){
 
 #if defined (ESP8266) || defined (ESP32)
 #if defined (TJPGD_LOAD_SD_LIBRARY)
@@ -223,10 +255,10 @@ JRESULT TJpg_Decoder::getJpgSize(uint16_t *w, uint16_t *h, const char *pFilename
 
 /***************************************************************************************
 ** Function name:           getJpgSize
-** Description:             Get width and height of a jpg file (name in String)
+** Description:             Get width and height of a jpg file (name in string)
 ***************************************************************************************/
 // Generic file call for SD or SPIFFS, uses leading / to distinguish SPIFFS files
-JRESULT TJpg_Decoder::getJpgSize(uint16_t *w, uint16_t *h, const String& pFilename){
+JRESULT TJpg_Decoder::getJpgSize(uint16_t *w, uint16_t *h, const string& pFilename){
 
 #if defined (ESP8266) || defined (ESP32)
 #if defined (TJPGD_LOAD_SD_LIBRARY)
@@ -275,9 +307,9 @@ JRESULT TJpg_Decoder::drawFsJpg(int32_t x, int32_t y, const char *pFilename) {
 
 /***************************************************************************************
 ** Function name:           drawFsJpg
-** Description:             Draw a named jpg SPIFFS file at x,y (name in String)
+** Description:             Draw a named jpg SPIFFS file at x,y (name in string)
 ***************************************************************************************/
-JRESULT TJpg_Decoder::drawFsJpg(int32_t x, int32_t y, const String& pFilename) {
+JRESULT TJpg_Decoder::drawFsJpg(int32_t x, int32_t y, const string& pFilename) {
 #ifdef USE_LITTLEFS
   // Check if file exists
   if ( !LittleFS.exists(pFilename) )
@@ -359,7 +391,7 @@ JRESULT TJpg_Decoder::getFsJpgSize(uint16_t *w, uint16_t *h, const char *pFilena
 ** Function name:           getFsJpgSize
 ** Description:             Get width and height of a jpg saved in  SPIFFS
 ***************************************************************************************/
-JRESULT TJpg_Decoder::getFsJpgSize(uint16_t *w, uint16_t *h, const String& pFilename) {
+JRESULT TJpg_Decoder::getFsJpgSize(uint16_t *w, uint16_t *h, const string& pFilename) {
 #ifdef USE_LITTLEFS
   // Check if file exists
   if ( !LittleFS.exists(pFilename) )
@@ -422,36 +454,52 @@ JRESULT TJpg_Decoder::getFsJpgSize(uint16_t *w, uint16_t *h, fs::File inFile) {
 JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, const char *pFilename) {
 
   // Check if file exists
-  if ( !SD.exists(pFilename) )
-  {
-    Serial.println(F("Jpeg file not found"));
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename, FA_READ);
+
+  if (fr){
     return JDR_INP;
   }
 
-    return drawSdJpg(x, y, SD.open( pFilename, FILE_READ));
+    // return drawSdJpg(x, y, SD.open( pFilename, FILE_READ));
+    return drawSdJpg(x, y, thisPtr->jpgSdFile);
 }
 
 /***************************************************************************************
 ** Function name:           drawSdJpg
-** Description:             Draw a named jpg SD file at x,y (name in String)
+** Description:             Draw a named jpg SD file at x,y (name in string)
 ***************************************************************************************/
-JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, const String& pFilename) {
+JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, const string& pFilename) {
 
   // Check if file exists
-  if ( !SD.exists(pFilename) )
-  {
-    Serial.println(F("Jpeg file not found"));
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename.c_str(), FA_READ);
+
+  if (fr){
     return JDR_INP;
   }
 
-    return drawSdJpg(x, y, SD.open( pFilename, FILE_READ));
+    // return drawSdJpg(x, y, SD.open( pFilename, FILE_READ));
+    return drawSdJpg(x, y, thisPtr->jpgSdFile);
 }
 
 /***************************************************************************************
 ** Function name:           drawSdJpg
 ** Description:             Draw a jpg with opened SD file handle at x,y
 ***************************************************************************************/
-JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, File inFile) {
+JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, FIL inFile) {
   JDEC jdec;
   JRESULT jresult = JDR_OK;
 
@@ -471,7 +519,94 @@ JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, File inFile) {
   }
 
   // Close file
-  if (jpgSdFile) jpgSdFile.close();
+  // if (jpgSdFile) jpgSdFile.close();
+  f_close(&jpgSdFile);
+
+  return jresult;
+
+}
+
+
+/***************************************************************************************
+** Function name:           drawSdAudioJpg
+** Description:             Draw a named jpg SD file at x,y (name in char array)
+***************************************************************************************/
+// Call specific to SD
+JRESULT TJpg_Decoder::drawSdAudioJpg(int32_t x, int32_t y, const char *pFilename, int32_t jpegOffset, int32_t jpegSize) {
+
+  // Check if file exists
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename, FA_READ);
+
+  if (fr){
+    return JDR_INP;
+  }
+
+    // return drawSdAudioJpg(x, y, SD.open( pFilename, FILE_READ), jpegOffset, jpegSize);
+    return drawSdAudioJpg(x, y, thisPtr->jpgSdFile, jpegOffset, jpegSize);
+}
+
+/***************************************************************************************
+** Function name:           drawSdAudioJpg
+** Description:             Draw a named jpg SD file at x,y (name in string)
+***************************************************************************************/
+JRESULT TJpg_Decoder::drawSdAudioJpg(int32_t x, int32_t y, const string& pFilename, int32_t jpegOffset, int32_t jpegSize) {
+
+  // Check if file exists
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename.c_str(), FA_READ);
+
+  if (fr){
+    return JDR_INP;
+  }
+
+    // return drawSdAudioJpg(x, y, SD.open( pFilename, FILE_READ), jpegOffset, jpegSize);
+  return drawSdAudioJpg(x, y, thisPtr->jpgSdFile, jpegOffset, jpegSize);
+}
+
+/***************************************************************************************
+** Function name:           drawSdAudioJpg
+** Description:             Draw a jpg in audio file with opened SD file handle at x,y
+***************************************************************************************/
+JRESULT TJpg_Decoder::drawSdAudioJpg(int32_t x, int32_t y, FIL inFile, int32_t jpegOffset, int32_t jpegSize) {
+  JDEC jdec;
+  JRESULT jresult = JDR_OK;
+
+  jpg_source = TJPG_SD_AUDIO_FILE;
+  jpeg_x = x;
+  jpeg_y = y;
+
+  jpeg_offset = jpegOffset;
+  jpeg_size = jpegSize;
+  
+  jpeg_start = true;
+  jpeg_buf_count = 0;
+
+  jdec.swap = _swap;
+
+  jpgSdFile = inFile;
+
+  jresult = jd_prepare(&jdec, jd_input, workspace, TJPGD_WORKSPACE_SIZE, 0);
+
+  // Extract image and render
+  if (jresult == JDR_OK) {
+    jresult = jd_decomp(&jdec, jd_output, jpgScale);
+  }
+
+  // Close file
+  // if (jpgSdFile) jpgSdFile.close();
+  f_close(&jpgSdFile);
 
   return jresult;
 
@@ -485,36 +620,52 @@ JRESULT TJpg_Decoder::drawSdJpg(int32_t x, int32_t y, File inFile) {
 JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, const char *pFilename) {
 
   // Check if file exists
-  if ( !SD.exists(pFilename) )
-  {
-    Serial.println(F("Jpeg file not found"));
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename, FA_READ);
+
+  if (fr){
     return JDR_INP;
   }
 
-    return getSdJpgSize(w, h, SD.open( pFilename, FILE_READ));
+    // return getSdJpgSize(w, h, SD.open( pFilename, FILE_READ));
+    return getSdJpgSize(w, h, thisPtr->jpgSdFile);
 }
 
 /***************************************************************************************
 ** Function name:           getSdJpgSize
 ** Description:             Get width and height of a jpg saved in  SPIFFS
 ***************************************************************************************/
-JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, const String& pFilename) {
+JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, const string& pFilename) {
 
   // Check if file exists
-  if ( !SD.exists(pFilename) )
-  {
-    Serial.println(F("Jpeg file not found"));
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename.c_str(), FA_READ);
+
+  if (fr){
     return JDR_INP;
   }
 
-    return getSdJpgSize(w, h, SD.open( pFilename, FILE_READ));
+    // return getSdJpgSize(w, h, SD.open( pFilename, FILE_READ));
+    return getSdJpgSize(w, h, thisPtr->jpgSdFile);
 }
 
 /***************************************************************************************
 ** Function name:           getSdJpgSize
 ** Description:             Get width and height of a jpg saved in SPIFFS
 ***************************************************************************************/
-JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, File inFile) {
+JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, FIL inFile) {
   JDEC jdec;
   JRESULT jresult = JDR_OK;
 
@@ -533,7 +684,93 @@ JRESULT TJpg_Decoder::getSdJpgSize(uint16_t *w, uint16_t *h, File inFile) {
   }
 
   // Close file
-  if (jpgSdFile) jpgSdFile.close();
+  // if (jpgSdFile) jpgSdFile.close();
+  f_close(&jpgSdFile);
+
+  return jresult;
+}
+
+
+/***************************************************************************************
+** Function name:           getSdAudioJpgSize
+** Description:             Get width and height of a jpg saved in  SPIFFS
+***************************************************************************************/
+// Call specific to SD
+JRESULT TJpg_Decoder::getSdAudioJpgSize(uint16_t *w, uint16_t *h, const char *pFilename, int32_t jpegOffset, int32_t jpegSize) {
+
+  // Check if file exists
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename, FA_READ);
+
+  if (fr){
+    return JDR_INP;
+  }
+    // return getSdAudioJpgSize(w, h, SD.open( pFilename, FILE_READ), jpegOffset, jpegSize);
+    return getSdAudioJpgSize(w, h, thisPtr->jpgSdFile, jpegOffset, jpegSize);
+}
+
+/***************************************************************************************
+** Function name:           getSdAudioJpgSize
+** Description:             Get width and height of a jpg saved in  SPIFFS
+***************************************************************************************/
+JRESULT TJpg_Decoder::getSdAudioJpgSize(uint16_t *w, uint16_t *h, const string& pFilename, int32_t jpegOffset, int32_t jpegSize) {
+
+  // Check if file exists
+  // if ( !SD.exists(pFilename) )
+  // {
+  //   Serial.println(F("Jpeg file not found"));
+  //   return JDR_INP;
+  // }
+
+  FRESULT fr;
+  f_open(&thisPtr->jpgSdFile, pFilename.c_str(), FA_READ);
+
+  if (fr){
+    return JDR_INP;
+  }
+
+    // return getSdAudioJpgSize(w, h, SD.open( pFilename, FILE_READ), jpegOffset, jpegSize);
+    return getSdAudioJpgSize(w, h, thisPtr->jpgSdFile, jpegOffset, jpegSize);
+}
+
+/***************************************************************************************
+** Function name:           getSdAudioJpgSize
+** Description:             Get width and height of a jpg saved in SPIFFS
+***************************************************************************************/
+JRESULT TJpg_Decoder::getSdAudioJpgSize(uint16_t *w, uint16_t *h, FIL inFile, int32_t jpegOffset, int32_t jpegSize) {
+  JDEC jdec;
+  JRESULT jresult = JDR_OK;
+
+  *w = 0;
+  *h = 0;
+
+  jpeg_offset = jpegOffset;
+  jpeg_size = jpegSize;
+  
+  jpeg_start = true;
+  jpeg_buf_count = 0;
+
+
+  jpg_source = TJPG_SD_AUDIO_FILE;
+
+  jpgSdFile = inFile;
+
+  jresult = jd_prepare(&jdec, jd_input, workspace, TJPGD_WORKSPACE_SIZE, 0);
+
+  if (jresult == JDR_OK) {
+    *w = jdec.width;
+    *h = jdec.height;
+  }
+
+  // Close file
+  // if (jpgSdFile) jpgSdFile.close();
+  f_close(&thisPtr->jpgSdFile);
 
   return jresult;
 }

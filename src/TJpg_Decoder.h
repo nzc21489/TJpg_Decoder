@@ -14,8 +14,12 @@ https://github.com/Bodmer/TJpg_Decoder
   #define TJpg_Decoder_H
 
   #include "User_Config.h"
-  #include "Arduino.h"
+  // #include "Arduino.h"
   #include "tjpgd.h"
+
+  #include <string>
+
+  using namespace std;
 
   #if defined (ESP8266) || defined (ESP32)
     #include <pgmspace.h>
@@ -30,13 +34,16 @@ https://github.com/Bodmer/TJpg_Decoder
   #endif
 
 #if defined (TJPGD_LOAD_SD_LIBRARY)
-  #include <SD.h>
+  // #include <SD.h>
+  #include "ff.h"
 #endif
+
 
 enum {
 	TJPG_ARRAY = 0,
 	TJPG_FS_FILE,
-	TJPG_SD_FILE
+	TJPG_SD_FILE,
+  TJPG_SD_AUDIO_FILE
 };
 
 //------------------------------------------------------------------------------
@@ -47,11 +54,11 @@ class TJpg_Decoder {
 
 private:
 #if defined (TJPGD_LOAD_SD_LIBRARY)
-  File jpgSdFile;
+  FIL jpgSdFile;
 #endif
 
 #ifdef TJPGD_LOAD_SPIFFS
-  fs::File jpgFile;
+  fs::FIL jpgFile;
 #endif
 
 public:
@@ -68,30 +75,38 @@ public:
 
 #if defined (TJPGD_LOAD_SD_LIBRARY) || defined (TJPGD_LOAD_SPIFFS)
   JRESULT drawJpg (int32_t x, int32_t y, const char *pFilename);
-  JRESULT drawJpg (int32_t x, int32_t y, const String& pFilename);
+  JRESULT drawJpg (int32_t x, int32_t y, const string& pFilename);
 
   JRESULT getJpgSize(uint16_t *w, uint16_t *h, const char *pFilename);
-  JRESULT getJpgSize(uint16_t *w, uint16_t *h, const String& pFilename);
+  JRESULT getJpgSize(uint16_t *w, uint16_t *h, const string& pFilename);
 #endif
 
 #if defined (TJPGD_LOAD_SD_LIBRARY)
   JRESULT drawSdJpg (int32_t x, int32_t y, const char *pFilename);
-  JRESULT drawSdJpg (int32_t x, int32_t y, const String& pFilename);
-  JRESULT drawSdJpg (int32_t x, int32_t y, File inFile);
+  JRESULT drawSdJpg (int32_t x, int32_t y, const string& pFilename);
+  JRESULT drawSdJpg (int32_t x, int32_t y, FIL inFile);
 
   JRESULT getSdJpgSize(uint16_t *w, uint16_t *h, const char *pFilename);
-  JRESULT getSdJpgSize(uint16_t *w, uint16_t *h, const String& pFilename);
-  JRESULT getSdJpgSize(uint16_t *w, uint16_t *h, File inFile);
+  JRESULT getSdJpgSize(uint16_t *w, uint16_t *h, const string& pFilename);
+  JRESULT getSdJpgSize(uint16_t *w, uint16_t *h, FIL inFile);
+
+  JRESULT drawSdAudioJpg (int32_t x, int32_t y, const char *pFilename, int32_t jpegOffset, int32_t jpegSize);
+  JRESULT drawSdAudioJpg (int32_t x, int32_t y, const string& pFilename, int32_t jpegOffset, int32_t jpegSize);
+  JRESULT drawSdAudioJpg (int32_t x, int32_t y, FIL inFile, int32_t jpegOffset, int32_t jpegSize);
+
+  JRESULT getSdAudioJpgSize(uint16_t *w, uint16_t *h, const char *pFilename, int32_t jpegOffset, int32_t jpegSize);
+  JRESULT getSdAudioJpgSize(uint16_t *w, uint16_t *h, const string& pFilename, int32_t jpegOffset, int32_t jpegSize);
+  JRESULT getSdAudioJpgSize(uint16_t *w, uint16_t *h, FIL inFile, int32_t jpegOffset, int32_t jpegSize);
 #endif
 
 #ifdef TJPGD_LOAD_SPIFFS
   JRESULT drawFsJpg (int32_t x, int32_t y, const char *pFilename);
-  JRESULT drawFsJpg (int32_t x, int32_t y, const String& pFilename);
-  JRESULT drawFsJpg (int32_t x, int32_t y, fs::File inFile);
+  JRESULT drawFsJpg (int32_t x, int32_t y, const string& pFilename);
+  JRESULT drawFsJpg (int32_t x, int32_t y, fs::FIL inFile);
 
   JRESULT getFsJpgSize(uint16_t *w, uint16_t *h, const char *pFilename);
-  JRESULT getFsJpgSize(uint16_t *w, uint16_t *h, const String& pFilename);
-  JRESULT getFsJpgSize(uint16_t *w, uint16_t *h, fs::File inFile);
+  JRESULT getFsJpgSize(uint16_t *w, uint16_t *h, const string& pFilename);
+  JRESULT getFsJpgSize(uint16_t *w, uint16_t *h, fs::FIL inFile);
 #endif
 
   JRESULT drawJpg(int32_t x, int32_t y, const uint8_t array[], uint32_t  array_size);
@@ -118,6 +133,12 @@ public:
   SketchCallback tft_output = nullptr;
 
   TJpg_Decoder *thisPtr = nullptr;
+
+  int32_t jpeg_offset = 0;
+  int32_t jpeg_size = 0;
+
+  bool jpeg_start = true;
+  uint32_t jpeg_buf_count = 0;
 };
 
 extern TJpg_Decoder TJpgDec;
