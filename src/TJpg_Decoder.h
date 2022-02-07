@@ -141,6 +141,6 @@ public:
   uint32_t jpeg_buf_count = 0;
 };
 
-extern TJpg_Decoder TJpgDec;
+extern TJpg_Decoder *TJpgDec;
 
 #endif // TJpg_Decoder_H

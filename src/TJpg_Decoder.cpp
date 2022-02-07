@@ -11,7 +11,7 @@ https://github.com/Bodmer/TJpg_Decoder
 #include <string.h>
 
 // Create a class instance to be used by the sketch (defined as extern in header)
-TJpg_Decoder TJpgDec;
+TJpg_Decoder *TJpgDec;
 
 /***************************************************************************************
 ** Function name:           TJpg_Decoder
@@ -78,7 +78,7 @@ void TJpg_Decoder::setCallback(SketchCallback sketchCallback)
 ***************************************************************************************/
 unsigned int TJpg_Decoder::jd_input(JDEC* jdec, uint8_t* buf, unsigned int len)
 {
-  TJpg_Decoder *thisPtr = TJpgDec.thisPtr;
+  TJpg_Decoder *thisPtr = TJpgDec->thisPtr;
   jdec = jdec; // Supress warning
 
   // Handle an array input
@@ -173,7 +173,7 @@ unsigned int TJpg_Decoder::jd_input(JDEC* jdec, uint8_t* buf, unsigned int len)
 int TJpg_Decoder::jd_output(JDEC* jdec, void* bitmap, JRECT* jrect)
 {
   // This is a static function so create a pointer to access other members of the class
-  TJpg_Decoder *thisPtr = TJpgDec.thisPtr;
+  TJpg_Decoder *thisPtr = TJpgDec->thisPtr;
 
   jdec = jdec; // Supress warning as ID is not used
 
